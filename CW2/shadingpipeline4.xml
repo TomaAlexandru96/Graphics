@@ -64,6 +64,7 @@ void main(void)
 }
 
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 410 
@@ -189,11 +190,10 @@ vertex get_interpolant(float a, float b, float c, vertex triangle[3])
 void subdivide(vertex start_v[3], int subdivisions)
 {
 	float layers = pow(2, subdivisions);
-	vertex top_layer = start_v[0];
-	for (int i = 0; i <= layers; i++)
+	for (int i = 0; i < layers; i++)
 	{
-		vertex next_top_layer;
-		for (int j = 0; j <= i * 2 + 3; i++)
+		int verticies = i * 2 + 3;
+		for (int j = 0; j < verticies;  j++)
 		{
 			float a = 0.0;
 			float b = 0.0;
@@ -202,13 +202,17 @@ void subdivide(vertex start_v[3], int subdivisions)
 			if (j % 2 == 0)
 			{
 				// bottom
-				a = (layers - i) / layers + 1;
+				a = (layers - i - 1) / layers;
+				c = j / (2 * layers);
 			}
 			else
 			{
 				// top
 				a = (layers - i) / layers;
+				c = (j - 1) / (2 * layers);
 			}
+
+			b = 1 - a - c;
 
 			vertex v = get_interpolant(a, b, c, start_v);
 
@@ -218,65 +222,27 @@ void subdivide(vertex start_v[3], int subdivisions)
     		frag.textureCoordinate = v.textureCoordinate;
 	    	frag.color = v.color;
 			EmitVertex();
-
-			if (j == 0)
-			{
-				next_top_layer = v;
-			}
 		}
 		EndPrimitive(); // end strip
-		top_layer = next_top_layer;
 	}
+}
+
+void draw_triangle(vertex v[3])
+{
+	for (int i = 0; i < 3; i++) 
+	{ // You used triangles, so it's always 3
+    	gl_Position = v[i].world;
+    	frag.position_camSpace = v[i].position_camSpace;
+    	frag.normal_camSpace = v[i].normal_camSpace;
+    	frag.textureCoordinate = v[i].textureCoordinate;
+    	frag.color = v[i].color;
+		EmitVertex();
+  	}
+  	EndPrimitive();
 }
 
 void main()
 {
-	/*vertex x = vertex(
-		vec4(1, 2, 3, 0),
-  		vec3(1, 0, 0),
-	    vec2(0, 0),
-  		vec4(0, 1, 0, 0),
-	  	vec4(1, 2, 3, 0)
-	);
-
-	vertex y = vertex(
-		vec4(2, 2, 3, 0),
-  		vec3(1, 0, 0),
-	    vec2(0, 0),
-  		vec4(0, 1, 0, 0),
-	  	vec4(2, 2, 3, 0)
-	);
-
-	vertex z = vertex(
-		vec4(2, 4, 3, 0),
-  		vec3(1, 0, 0),
-	    vec2(0, 0),
-  		vec4(0, 1, 0, 0),
-	  	vec4(2, 4, 3, 0)
-	);
-	vertex vv = x;
-    gl_Position = vv.world;
-    frag.position_camSpace = vv.position_camSpace;
-    frag.normal_camSpace = vv.normal_camSpace;
-    frag.textureCoordinate = vv.textureCoordinate;
-    frag.color = vv.color;
-	EmitVertex();
-	vv = y;
-    gl_Position = vv.world;
-    frag.position_camSpace = vv.position_camSpace;
-    frag.normal_camSpace = vv.normal_camSpace;
-    frag.textureCoordinate = vv.textureCoordinate;
-    frag.color = vv.color;
-	EmitVertex();
-	vv = z;
-    gl_Position = vv.world;
-    frag.position_camSpace = vv.position_camSpace;
-    frag.normal_camSpace = vv.normal_camSpace;
-    frag.textureCoordinate = vv.textureCoordinate;
-    frag.color = vv.color;
-	EmitVertex();
-  	EndPrimitive();*/
-
 	vertex start_triangle[3];
 	for (int i = 0; i < 3; i++) 
 	{
@@ -289,13 +255,16 @@ void main()
 		);
 		start_triangle[i] = v;
 	}
+	// draw_triangle(start_triangle);
 	subdivide(start_triangle, nr_of_subdivisions);
 }
+
 
 
 ]]></geom>
 <frag>
 <![CDATA[#version 410
+#define M_PI 3.14159265359
 
 uniform vec4 ambient;
 uniform vec4 diffuse;
@@ -317,11 +286,32 @@ in fragmentData
 
 out vec4 fragColor; 
 
+vec4 get_phong_shading()
+{
+	// surface normal
+	vec4 n = vec4(frag.normal_camSpace, 0);
+	// unit vector in direction of light
+	vec4 l = lightPosition_camSpace - frag.position_camSpace;
+	vec4 v = -normalize(frag.position_camSpace);
+	float n_dot_l = max(dot(normalize(n), normalize(l)), 0);
+	vec4 r = 2 * dot(normalize(n), normalize(l)) * normalize(n) - normalize(l);
+	float v_dot_r = max(dot(v, r), 0);
+	float d = sqrt(dot(l, l));
+
+	vec4 ambientI = ambientCoefficent * ambient;
+	vec4 diffuseI = diffuseCoefficent * diffuse * n_dot_l;
+	vec4 specularI = specularCoefficent * specular * ((shininess + 2) / (2 * M_PI)) * pow(v_dot_r, shininess);
+	vec4 phong_light = ambientI + diffuseI + specularI;
+
+	return phong_light;
+}
+
 //Fragment shader computes the final color
 void main(void)
 {
-  fragColor =  frag.color;
+  fragColor = get_phong_shading();
 }
+
 
 
 ]]></frag>
@@ -348,6 +338,7 @@ void main(void)
 }
 
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 410
@@ -363,6 +354,7 @@ void main(void)
   //Render the texture on a quad
   fragColor = texture(textureRendered, varyingTextureCoordinate.st);
 }
+
 
 
 ]]></R2TFrag>
