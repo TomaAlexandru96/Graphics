@@ -63,6 +63,7 @@ void main(void)
   gl_Position = pMatrix * vertex_camSpace;
 }
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 410 
@@ -106,6 +107,7 @@ void main() {
   EndPrimitive();
  }
 
+
 ]]></geom>
 <frag>
 <![CDATA[#version 410
@@ -136,6 +138,7 @@ void main(void)
   fragColor =  frag.color;
 }
 
+
 ]]></frag>
 <R2TVert>
 <![CDATA[#version 410
@@ -159,6 +162,7 @@ void main(void)
   gl_Position = pMatrix * vertex_camSpace;
 }
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 410
@@ -177,7 +181,7 @@ float s[12] = float[](-0.10568,  -0.07568,    -0.042158,
 
 vec4 blurImage(void)
 {
-  vec2 pointToCenter = vec2(0.5, 0.5) - varyingTextureCoordinate;
+  vec2 pointToCenter = normalize(vec2(0.5, 0.5) - varyingTextureCoordinate);
   vec4 blur = vec4(0, 0, 0, 0);
   for (int i = 0; i < 12; i++)
   {
@@ -193,6 +197,7 @@ void main(void)
   // fragColor = texture(textureRendered, varyingTextureCoordinate.st);
   fragColor = blurImage();
 }
+
 
 ]]></R2TFrag>
 </pipeline>
