@@ -52,6 +52,7 @@ void main(void)
 
 
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 400
@@ -105,6 +106,7 @@ void main() {
 
 
 
+
 ]]></geom>
 <frag>
 <![CDATA[#version 400
@@ -133,6 +135,7 @@ void main(void)
 	//Not used in that task
     fragColor =  frag.color;
 }
+
 
 
 
@@ -179,6 +182,7 @@ void  main ()
 
 
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 400
@@ -195,15 +199,15 @@ uniform mat4 mvMatrixScene;
 uniform mat4 pMatrix;
 uniform mat3 normalMatrix; //mv matrix without translation
 
-const int raytraceDepth = 42;
+const int raytraceDepth = 3;
 const int numSpheres = 6;
 
 // light
-const vec4 ambient_c = vec4(0.1, 0.1, 0.1, 1);
-const vec4 diffuse_c = vec4(0.3, 0.3, 0.3, 1);
-const vec4 specular_c = vec4(1, 1, 1, 1);
-const float shininess = 1;
-const vec4 light_pos = vec4(6, 4, 3, 1);
+const float ambient_c = 0.1;
+const float diffuse_c = 0.5;
+const float specular_c = 1;
+const float shininess = 3;
+vec4 light_pos = vec4(6, 4, 3, 1);
 
 // illumination
 vec4 get_phong_shading(vec4 point_position, vec4 point_normal, vec4 light_position,
@@ -221,7 +225,7 @@ vec4 get_phong_shading(vec4 point_position, vec4 point_normal, vec4 light_positi
 
 	vec4 ambient = ambient_c * colour;
 	vec4 diffuse = diffuse_c * colour;
-	vec4 specular = specular_c * colour;
+	vec4 specular = specular_c * vec4(1, 1, 1, 1);
 
 	vec4 ambientI = ambient;
 	vec4 diffuseI = diffuse * n_dot_l;
@@ -261,6 +265,7 @@ struct Intersection
     float t; //closest hit
     vec3 point;	// hit point
     vec3 normal;	// normal
+	vec3 exit;
     int hit;	//did it hit?
     vec3 colour; // colour accumulation, can be also implemented in struct Ray
 };
@@ -269,7 +274,6 @@ void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 {
 	//TODO implement sphere intersection function
 	vec3 delta_p = ray.origin - sph.centre;
-	// float delta = dot(ray_normalized_dir, delta_p) - pow(length(delta_p), 2) + pow(sph.radius, 2);
 	float delta = pow(dot(ray.dir, delta_p), 2) - pow(length(delta_p), 2)  + pow(sph.radius, 2);
 
 	if (delta < 0)
@@ -278,19 +282,31 @@ void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 	}
 	else
 	{
-		float miu = min(-dot(ray.dir, delta_p) - sqrt(delta),
-									-dot(ray.dir, delta_p) + sqrt(delta));
-		if (abs(miu) < 0.0001f)
+		float miu1 = -dot(ray.dir, delta_p) - sqrt(delta);
+		float miu2	 = -dot(ray.dir, delta_p) + sqrt(delta);
+
+		if (abs(miu1) < 0.0001f)
 		{
-			miu = 0;
+			miu1 = 0;
 		}
-		intersect.point = ray.origin + miu * ray.dir;
+		if (abs(miu2) < 0.0001f)
+		{
+			miu2 = 0;
+		}
+
+		float miu_close = min(miu1, miu2);
+		float miu_far = max(miu1, miu2);
+
+		vec3 ray1 = ray.origin + miu_close * ray.dir;
+		vec3 ray2 = ray.origin + miu_far * ray.dir;
+
+		intersect.exit = ray2;
+		intersect.point = ray1;
 		intersect.hit = 1;
 		// not sure
-		intersect.normal = 2 * normalize((sph.centre - intersect.point));
+		intersect.normal = 2 * (sph.centre - intersect.point);
 		intersect.colour = get_phong_shading(vec4(intersect.point, 1), vec4(intersect.normal, 1), light_pos,
 									 		vec4(sph.colour, 1)).xyz;
-		// intersect.normal = vec3(4, 4, 4);
 	}
 }
 
@@ -368,8 +384,33 @@ float rnd()
 
 vec3 computeShadow(in Intersection intersect)
 {
-	//TODO implement shadow computation
-	return vec3(0,0,0);
+	Ray shadow_ray = Ray(intersect.point, normalize(light_pos.xyz - intersect.exit));
+	Intersection i2;
+	Intersect(shadow_ray, i2);
+	if (i2.hit == 0) 
+	{
+		return intersect.colour;
+	}
+	else
+	{ 
+		return intersect.colour * 0;
+	}
+}
+
+vec4 translate_point(vec4 point)
+{
+	return mvMatrixScene * pMatrix * point;
+}
+
+void move_objects()
+{
+	for (int s = 0; s < numSpheres; s++) 
+	{
+		vec4 h_point = translate_point(vec4(sphere[s].centre, 1));
+		sphere[s].centre = h_point.xyz / h_point.w;
+	}
+
+	light_pos = translate_point(light_pos);
 }
 
 void main()
@@ -399,6 +440,8 @@ void main()
 	seed = int(mod(dir.x * dir.y * 39786038.0, 65536.0));
 	//scene definition end
 
+	// move_objects();
+
 	//TODO implement ray tracing main loop here
 	Ray r = Ray(r_pos.xyz, normalize(dir));
 
@@ -412,7 +455,7 @@ void main()
 		if (currentIntersection.hit != 0)
 		{
 			colour = vec4(currentIntersection.colour + colour.xyz, 1);
-			// computeShadow(currentIntersection);
+			colour += vec4(computeShadow(currentIntersection), 1);
 		}
 		else
 		{
@@ -435,6 +478,7 @@ void main()
 		outcolour = vec4(0, 1, 0, 1);
 	}
 }
+
 
 
 
