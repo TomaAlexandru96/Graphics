@@ -53,6 +53,7 @@ void main(void)
 
 
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 400
@@ -107,6 +108,7 @@ void main() {
 
 
 
+
 ]]></geom>
 <frag>
 <![CDATA[#version 400
@@ -135,6 +137,7 @@ void main(void)
 	//Not used in that task
     fragColor =  frag.color;
 }
+
 
 
 
@@ -183,10 +186,11 @@ void  main ()
 
 
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 400
-#define EPSILON 0.00001
+#define EPSILON 0.01
 #define M_PI 3.14159265359
 
 in vec3 dir; 
@@ -199,12 +203,12 @@ uniform mat4 mvMatrixScene;
 uniform mat4 pMatrix;
 uniform mat3 normalMatrix; //mv matrix without translation
 
-const int raytraceDepth = 3;
+const int raytraceDepth = 5;
 const int numSpheres = 6;
 
 // light
-const float ambient_c = 0.1;
-const float diffuse_c = 0.5;
+const float ambient_c = 0.4 / raytraceDepth;
+const float diffuse_c = 0.8 / raytraceDepth;
 const float specular_c = 1;
 const float shininess = 3;
 vec4 light_pos = vec4(6, 4, 3, 1);
@@ -265,10 +269,14 @@ struct Intersection
     float t; //closest hit
     vec3 point;	// hit point
     vec3 normal;	// normal
-	vec3 exit;
     int hit;	//did it hit?
     vec3 colour; // colour accumulation, can be also implemented in struct Ray
 };
+
+vec3 get_ray(Ray r, float miu)
+{
+	return r.origin + miu * r.dir;
+}
 
 void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 {
@@ -285,22 +293,18 @@ void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 		float miu1 = -dot(ray.dir, delta_p) - sqrt(delta);
 		float miu2	 = -dot(ray.dir, delta_p) + sqrt(delta);
 
-		if (abs(miu1) < 0.0001f)
-		{
-			miu1 = 0;
-		}
-		if (abs(miu2) < 0.0001f)
-		{
-			miu2 = 0;
-		}
-
 		float miu_close = min(miu1, miu2);
-		float miu_far = max(miu1, miu2);
 
-		vec3 ray1 = ray.origin + miu_close * ray.dir;
-		vec3 ray2 = ray.origin + miu_far * ray.dir;
+		vec3 ray1 = get_ray(ray, miu_close);
+		if (pow(length(ray1 - sph.centre), 2) - pow(sph.radius, 2) > 0)
+		{
+			ray1 = get_ray(ray, miu_close - EPSILON);
+			if (pow(length(ray1 - sph.centre), 2) - pow(sph.radius, 2) > 0)
+			{
+				ray1 = get_ray(ray, miu_close + EPSILON);
+			}
+		}
 
-		intersect.exit = ray2;
 		intersect.point = ray1;
 		intersect.hit = 1;
 		// not sure
@@ -312,7 +316,7 @@ void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 
 void plane_intersect(Plane pl, Ray ray, inout Intersection intersect)
 {
-	float d_dot_n = dot(ray.dir, pl.normal);
+	float d_dot_n = dot(ray.dir, normalize(pl.normal));
 	if (d_dot_n >= 0)
 	{
 		intersect.hit = 0;
@@ -384,7 +388,7 @@ float rnd()
 
 vec3 computeShadow(in Intersection intersect)
 {
-	Ray shadow_ray = Ray(intersect.point, normalize(light_pos.xyz - intersect.exit));
+	Ray shadow_ray = Ray(intersect.point, normalize(light_pos.xyz - intersect.point));
 	Intersection i2;
 	Intersect(shadow_ray, i2);
 	if (i2.hit == 0) 
@@ -399,7 +403,7 @@ vec3 computeShadow(in Intersection intersect)
 
 vec4 translate_point(vec4 point)
 {
-	return mvMatrixScene * pMatrix * point;
+	return vec4(0, 0, 36, 0) + mvMatrixScene * pMatrix * point;
 }
 
 void move_objects()
@@ -463,7 +467,6 @@ void main()
 		}
 		r.origin = currentIntersection.point;
 		// not sure if random
-		r.origin = r.origin + EPSILON * currentIntersection.normal;
 		r.dir = normalize(reflect(r.dir, currentIntersection.normal));
 		depth++;
 	}
@@ -478,6 +481,7 @@ void main()
 		outcolour = vec4(0, 1, 0, 1);
 	}
 }
+
 
 
 
