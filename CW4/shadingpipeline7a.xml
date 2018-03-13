@@ -56,6 +56,7 @@ void main(void)
 
 
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 400
@@ -98,6 +99,7 @@ void main() {
   }
   EndPrimitive();
 }
+
 
 
 
@@ -156,6 +158,7 @@ void main(void)
 
 
 
+
 ]]></frag>
 <R2TVert>
 <![CDATA[#version 400
@@ -195,10 +198,11 @@ void  main ()
 
 
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 400
-#define EPSILON 0.000001
+#define EPSILON 0.00001
 #define M_PI 3.14159265359
 
 in vec3 dir; 
@@ -217,10 +221,10 @@ const float mirror_reflection_extension = 0.5;
 const bool with_extension = true;
 
 // light
-const float ambient_c = 0.1;
-const float diffuse_c = 0.3;
-const float specular_c = 0.5;
-const float shininess = 2;
+const float ambient_c = 0.3;
+const float diffuse_c = 0.8;
+const float specular_c = 1;
+const float shininess = 4;
 vec4 light_pos = vec4(6, 4, 3, 1);
 
 // illumination
@@ -239,7 +243,7 @@ vec4 get_phong_shading(vec4 point_position, vec4 point_normal, vec4 light_positi
 
 	vec4 ambient = ambient_c * colour;
 	vec4 diffuse = diffuse_c * colour;
-	vec4 specular = specular_c * vec4(1, 1, 1, 1);
+	vec4 specular = specular_c * colour;
 
 	vec4 ambientI = ambient;
 	vec4 diffuseI = diffuse * n_dot_l;
@@ -306,16 +310,6 @@ void shpere_intersect(Sphere sph, Ray ray, inout Intersection intersect)
 		float miu_close = min(miu1, miu2);
 
 		vec3 ray1 = get_ray(ray, miu_close);
-		if (pow(length(ray1 - sph.centre), 2) - pow(sph.radius, 2) > 0)
-		{
-			miu_close = miu_close - EPSILON;
-			ray1 = get_ray(ray, miu_close);
-			if (pow(length(ray1 - sph.centre), 2) - pow(sph.radius, 2) > 0)
-			{
-				miu_close = miu_close + 2 * EPSILON;
-				ray1 = get_ray(ray, miu_close);
-			}
-		}
 
 		if (miu_close < 0) 
 		{
@@ -403,18 +397,18 @@ float rnd()
 	return float(seed)/509.0;
 }
 
-vec3 computeShadow(in Intersection intersect)
+float computeShadow(in Intersection intersect)
 {
 	Ray shadow_ray = Ray(intersect.point, normalize(light_pos.xyz - intersect.point));
 	Intersection i2;
 	Intersect(shadow_ray, i2);
 	if (i2.hit == 0) 
 	{
-		return intersect.colour;
+		return 1;
 	}
 	else
 	{ 
-		return intersect.colour * 0;
+		return 0;
 	}
 }
 
@@ -480,14 +474,15 @@ void main()
 			{
 				mirror_control = mirror_reflection_extension;
 			}
-			colour += mirror_control * vec4(currentIntersection.colour + colour.xyz, 1);
-			colour += vec4(computeShadow(currentIntersection), 1);
+			colour += mirror_control * vec4(currentIntersection.colour + colour.xyz, 1) * 
+							computeShadow(currentIntersection);
 		}
 		else
 		{
 			break;
 		}
 		r.origin = currentIntersection.point;
+		r.origin += currentIntersection.normal * EPSILON;
 		// not sure if random
 		r.dir = normalize(reflect(r.dir, currentIntersection.normal));
 		depth++;
@@ -503,6 +498,7 @@ void main()
 		outcolour = vec4(0, 1, 0, 1);
 	}
 }
+
 
 
 
