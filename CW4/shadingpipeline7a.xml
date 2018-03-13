@@ -55,6 +55,7 @@ void main(void)
 
 
 
+
 ]]></vertex>
 <geom>
 <![CDATA[#version 400
@@ -111,6 +112,7 @@ void main() {
 
 
 
+
 ]]></geom>
 <frag>
 <![CDATA[#version 400
@@ -139,6 +141,7 @@ void main(void)
 	//Not used in that task
     fragColor =  frag.color;
 }
+
 
 
 
@@ -191,6 +194,7 @@ void  main ()
 
 
 
+
 ]]></R2TVert>
 <R2TFrag>
 <![CDATA[#version 400
@@ -209,12 +213,14 @@ uniform mat3 normalMatrix; //mv matrix without translation
 
 const int raytraceDepth = 42;
 const int numSpheres = 6;
+const float mirror_reflection_extension = 0.5;
+const bool with_extension = true;
 
 // light
 const float ambient_c = 0.1;
-const float diffuse_c = 0.4;
-const float specular_c = 1;
-const float shininess = 4;
+const float diffuse_c = 0.3;
+const float specular_c = 0.5;
+const float shininess = 2;
 vec4 light_pos = vec4(6, 4, 3, 1);
 
 // illumination
@@ -469,7 +475,12 @@ void main()
 		Intersect(r, currentIntersection);
 		if (currentIntersection.hit != 0)
 		{
-			colour += vec4(currentIntersection.colour + colour.xyz, 1);
+			float mirror_control = 1;
+			if (with_extension)
+			{
+				mirror_control = mirror_reflection_extension;
+			}
+			colour += mirror_control * vec4(currentIntersection.colour + colour.xyz, 1);
 			colour += vec4(computeShadow(currentIntersection), 1);
 		}
 		else
@@ -492,6 +503,7 @@ void main()
 		outcolour = vec4(0, 1, 0, 1);
 	}
 }
+
 
 
 
